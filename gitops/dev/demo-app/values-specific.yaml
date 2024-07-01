@@ -1,2 +1,6 @@
 service:
   nodePort: 30103
+keptn:
+  appContext:
+    preDeploymentTasks:
+    - maintenance-window-check
