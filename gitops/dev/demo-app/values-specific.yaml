@@ -4,3 +4,9 @@ keptn:
   appContext:
     preDeploymentTasks:
     - maintenance-window-check
+    postDeploymentTasks:
+      - load-test
+    postDeploymentEvaluations:
+      - demoapp-heatlh-check
+    promotionTasks:
+      - promote
