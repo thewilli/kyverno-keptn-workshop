@@ -1,0 +1,52 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: keptn-analysis
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true  
+spec:
+  validationFailureAction: Audit
+  rules:
+    - name: keptn-analysis-failed
+      match:
+        any:
+        # AND across kinds and namespaceSelector
+        - resources:
+            # OR inside list of kinds
+            kinds:
+            - Analysis/status
+            operations:
+            - UPDATE
+      preconditions:
+        all:
+          - key: "{{ request.object.status.state || `[]` }}"
+            operator: Equals
+            value: "Completed"
+          - key: "{{ request.object.status.pass || `false` }}"
+            operator: NotEquals
+            value: true
+      generate:
+        apiVersion: batch/v1
+        kind: Job
+        name: rollback-flagd-{{request.object.metadata.resourceVersion}}
+        namespace: "argocd"
+        data:
+          spec:
+            ttlSecondsAfterFinished: 1000
+            template:    
+              spec:
+                containers:
+                  - name: argo-container
+                    image: ghcr.io/heckelmann/workshop-registry/argocd-cli:latest
+                    command: ["/rollback.sh", "flagd"]
+                    imagePullPolicy: Always
+                    volumeMounts:
+                      - name: secret-volume
+                        mountPath: /etc/argosecret
+                restartPolicy: Never
+                serviceAccountName: argocd-rollback
+                volumes:
+                  - name: secret-volume
+                    secret:
+                      secretName: argocd-initial-admin-secret
+            backoffLimit: 0

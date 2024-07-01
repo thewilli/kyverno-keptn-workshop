@@ -1,0 +1,42 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: feature-flag-change
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+spec:
+  rules:
+    - name: match-feature-flag-change
+      match:
+        any:
+        - resources:
+            kinds:
+            - FeatureFlag
+            operations:
+            - UPDATE
+            selector:
+              matchLabels:
+                app: sample-app
+                type: feature-flag
+      generate:
+        apiVersion: batch/v1
+        kind: Job
+        name: demo-app-load-test-{{request.object.metadata.resourceVersion}}
+        namespace: "demo-app-prod"
+        data:
+          spec:
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/instance: demo-app-prod
+              spec:
+                containers:
+                - command:
+                  - k6
+                  - run
+                  - https://raw.githubusercontent.com/heckelmann/kyverno-keptn-workshop/main/functions/load-prod.js
+                  image: grafana/k6:0.45.0
+                  imagePullPolicy: IfNotPresent
+                  name: load-test
+                restartPolicy: OnFailure
+            ttlSecondsAfterFinished: 300          

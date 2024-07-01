@@ -1,0 +1,37 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: load-test-completed
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true  
+spec:
+  rules:
+    - name: load-test-completed
+      preconditions:
+        any:
+          - key: "{{ request.object.status.succeeded || `[]` }}"
+            operator: Equals
+            value: 1    
+      match:
+        all:
+        - resources:
+            kinds:
+            - Job/status
+            operations:
+            - UPDATE           
+            selector:
+              matchLabels:
+                generate.kyverno.io/rule-name: match-feature-flag-change
+      generate:
+        apiVersion: metrics.keptn.sh/v1alpha3
+        kind: Analysis
+        name: service-analysis-kyverno-{{request.object.metadata.resourceVersion}}
+        namespace: "demo-app-prod"
+        data:
+          spec:
+            timeframe:
+              recent: 1m
+            args:
+              "workload": "demo-app-prod"
+            analysisDefinition:
+              name: demo-app-analysis            
